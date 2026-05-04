@@ -16,6 +16,8 @@ Buka terminal di dalam VSCode, lalu jalankan perintah ini untuk menginstal semua
 # Buka tab terminal ke-1 (Untuk Backend)
 cd apps/api
 npm install
+npm install @prisma/client
+npx prisma generate
 
 # Buka tab terminal ke-2 (Untuk Frontend)
 cd apps/web
