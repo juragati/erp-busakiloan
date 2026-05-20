@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Wallet, TrendingUp, Users, Truck, Target, Calendar, ArrowRight, Clock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import LoadingOverlay from './LoadingOverlay'; // Impor Pengunci Layar Loading
+import LoadingOverlay from './LoadingOverlay';
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -10,7 +10,7 @@ const MainDashboard = ({ setActiveTab }) => {
   const [orders, setOrders] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [finance, setFinance] = useState([]);
-  const [isLoading, setIsLoading] = useState(false); // State Interlock Loading
+  const [isLoading, setIsLoading] = useState(false);
   
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
@@ -21,7 +21,7 @@ const MainDashboard = ({ setActiveTab }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true); // Kunci layar saat mengambil data awal
+      setIsLoading(true);
       try {
         const [resO, resP, resF] = await Promise.all([ 
           axios.get(`${baseURL}/api/orders`), 
@@ -34,7 +34,7 @@ const MainDashboard = ({ setActiveTab }) => {
       } catch (e) { 
         console.error("Gagal memuat data dashboard", e); 
       } finally {
-        setIsLoading(false); // Buka kunci layar
+        setIsLoading(false);
       }
     };
     fetchData();
@@ -50,46 +50,48 @@ const MainDashboard = ({ setActiveTab }) => {
     return d >= start && d <= end;
   };
 
+  // AMAN: Filter rentang tanggal untuk seluruh data dasar
   const filteredOrders = orders.filter(o => isMatch(o.tanggal));
   const filteredPurchases = purchases.filter(p => isMatch(p.tanggal));
   const filteredFinance = finance.filter(f => isMatch(f.tanggal));
 
   let piutang = 0;
-  let profitKasar = 0; // Ini akan menghitung Profit Bersih Real dengan rumus sinkron ProfitDashboard
+  let profitKasar = 0; // Menghitung profit sinkron dengan ProfitDashboard
 
-  filteredOrders.forEach(o => { 
-    if (o.status !== 'DIBATALKAN') {
-      if (o.status === 'TERKIRIM') {
-         const tagihanTotal = o.totalHarga + (o.ongkosKirim || 0);
-         piutang += (tagihanTotal - o.dp); 
+  // 1. FILTER VALIDASI PROFIT: Hanya hitung yang SELESAI atau TERKIRIM
+  const profitValidOrders = filteredOrders.filter(o => o.status === 'SELESAI' || o.status === 'TERKIRIM');
+
+  profitValidOrders.forEach(o => {
+    let orderOmsetBarang = 0;
+    let orderModalBarang = 0;
+    let hasValidItem = false;
+
+    o.items.forEach(i => {
+      const hppValid = parseFloat(i.hppSatuan || 0);
+      const hargaJualValid = parseFloat(i.hargaSatuan || i.hargaJual || 0);
+      const qtyValid = parseFloat(i.qty || 0);
+
+      // SINKRONISASI TOTAL MODAL: Lewati jika HPP Rp 0
+      if (hppValid > 0) {
+        orderOmsetBarang += (hargaJualValid * qtyValid);
+        orderModalBarang += (hppValid * qtyValid);
+        hasValidItem = true;
       }
+    });
 
-      // SINKRONISASI TOTAL PROFIT DENGAN LOGIKA PROFITDASHBOARD
-      if (o.status === 'TERKIRIM' || o.status === 'SELESAI') {
-        let orderOmsetBarang = 0;
-        let orderModalBarang = 0;
-        let hasValidItem = false;
+    if (hasValidItem) {
+      const ongkirIn = parseFloat(o.ongkosKirim) || 0;
+      const ongkirOut = parseFloat(o.ongkosKirimModal) || 0;
+      // Rumus Laba Bersih: (Omset Jual - Modal HPP) + (Ongkir Masuk - Ongkir Keluar)
+      profitKasar += (orderOmsetBarang - orderModalBarang) + (ongkirIn - ongkirOut);
+    }
+  });
 
-        o.items.forEach(i => { 
-          const hppValid = parseFloat(i.hppSatuan || 0);
-          const hargaJualValid = parseFloat(i.hargaSatuan || i.hargaJual || 0);
-          const qtyValid = parseFloat(i.qty || 0);
-
-          // Hanya hitung item jika HPP > 0 (Sama persis dengan ProfitDashboard)
-          if (hppValid > 0) {
-            orderOmsetBarang += (hargaJualValid * qtyValid);
-            orderModalBarang += (hppValid * qtyValid);
-            hasValidItem = true;
-          }
-        });
-        
-        if (hasValidItem) {
-          const ongkirIn = parseFloat(o.ongkosKirim) || 0;
-          const ongkirOut = parseFloat(o.ongkosKirimModal) || 0;
-          // Rumus sinkron: (Jual - Modal) + Margin Ongkir
-          profitKasar += (orderOmsetBarang - orderModalBarang) + (ongkirIn - ongkirOut);
-        }
-      }
+  // 2. HITUNG PIUTANG BEREDAR DARI ORDER STATUS 'TERKIRIM' YANG BELUM LUNAS
+  filteredOrders.forEach(o => {
+    if (o.status === 'TERKIRIM') {
+      const tagihanTotal = o.totalHarga + (o.ongkosKirim || 0);
+      piutang += (tagihanTotal - o.dp);
     }
   });
 
@@ -107,7 +109,7 @@ const MainDashboard = ({ setActiveTab }) => {
 
   const debtList = Object.keys(supplierDebts).map(k => ({ nama: k, sisa: supplierDebts[k] })).sort((a,b) => b.sisa - a.sisa);
 
-  // LOGIKA MURNI: Omset & Kas disinkronkan langsung dari data finansial Kas Buku
+  // LOGIKA UTAMA FINANSIAL KAS BUKU
   const totalMasuk = filteredFinance.filter(f => f.tipe === 'PEMASUKAN').reduce((sum, f) => sum + f.nominal, 0);
   const totalKeluar = filteredFinance.filter(f => f.tipe === 'PENGELUARAN').reduce((sum, f) => sum + f.nominal, 0);
   const saldoKas = totalMasuk - totalKeluar;
@@ -130,62 +132,56 @@ const MainDashboard = ({ setActiveTab }) => {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-3 md:p-5 space-y-5 bg-gray-50/30 text-xs md:text-sm">
-      
-      {/* Pengunci Layar Global saat Pengambilan Data Berlangsung */}
       <LoadingOverlay isLoading={isLoading} />
 
-      {/* FILTER RENTANG TANGGAL DUA KALENDER */}
+      {/* FILTER CALENDAR BARIS */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center shrink-0">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Dashboard Analisis</h1>
-          <p className="text-xs font-bold text-gray-500 mt-1">Ringkasan finansial terintegrasi dan performa bisnis.</p>
+          <p className="text-xs font-bold text-gray-500 mt-1">Sistem Pemantauan Performa Bisnis Terintegrasi.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 w-full md:w-auto">
           <div className="flex items-center gap-2 text-blue-700 font-black text-xs px-2"><Calendar size={16}/> Filter Laporan:</div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <input type="date" className="border border-blue-200 bg-white p-2 rounded-lg text-xs font-bold text-gray-700 outline-none w-full sm:w-auto cursor-pointer shadow-xs" value={startDate} onChange={e=>setStartDate(e.target.value)} title="Tanggal Mulai"/>
+            <input type="date" className="border border-blue-200 bg-white p-2 rounded-lg text-xs font-bold text-gray-700 outline-none w-full sm:w-auto cursor-pointer" value={startDate} onChange={e=>setStartDate(e.target.value)} title="Tanggal Mulai"/>
             <span className="text-gray-400 font-black">-</span>
-            <input type="date" className="border border-blue-200 bg-white p-2 rounded-lg text-xs font-bold text-gray-700 outline-none w-full sm:w-auto cursor-pointer shadow-xs" value={endDate} onChange={e=>setEndDate(e.target.value)} title="Tanggal Akhir"/>
+            <input type="date" className="border border-blue-200 bg-white p-2 rounded-lg text-xs font-bold text-gray-700 outline-none w-full sm:w-auto cursor-pointer" value={endDate} onChange={e=>setEndDate(e.target.value)} title="Tanggal Akhir"/>
           </div>
         </div>
       </div>
 
-      {/* BLOK INDIKATOR FINANSIAL */}
+      {/* INDIKATOR METRICS UTAMA */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
-        <div onClick={() => setActiveTab('keuangan')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden">
-          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Kas Aktif (Global) <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors"><Wallet size={14}/></div></div>
+        <div onClick={() => setActiveTab('keuangan')} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group relative overflow-hidden">
+          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Kas Aktif (Global) <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><Wallet size={14}/></div></div>
           <h3 className={`text-sm md:text-xl font-black truncate relative z-10 ${saldoKas < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatRp(saldoKas)}</h3>
-          <div className="absolute bottom-2 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-purple-500 flex items-center gap-1 text-[10px] font-bold"><ArrowRight size={12}/> Detail</div>
         </div>
         
-        <div onClick={() => setActiveTab('keuangan')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden">
-          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Omset Masuk (Kas) <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><Target size={14}/></div></div>
+        <div onClick={() => setActiveTab('keuangan')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden">
+          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Omset Masuk (Kas) <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Target size={14}/></div></div>
           <h3 className="text-sm md:text-xl font-black text-blue-700 truncate relative z-10">{formatRp(omset)}</h3>
-          <div className="absolute bottom-2 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 flex items-center gap-1 text-[10px] font-bold"><ArrowRight size={12}/> Detail</div>
         </div>
         
-        <div onClick={() => setActiveTab('profit')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-green-300 hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden">
-          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Profit Terkirim <div className="p-1.5 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors"><TrendingUp size={14}/></div></div>
+        <div onClick={() => setActiveTab('profit')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-green-300 hover:shadow-md transition-all group relative overflow-hidden">
+          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Profit Terkirim <div className="p-1.5 bg-green-50 text-green-600 rounded-lg"><TrendingUp size={14}/></div></div>
           <h3 className="text-sm md:text-xl font-black text-green-600 truncate relative z-10">{formatRp(profitKasar)}</h3>
-          <div className="absolute bottom-2 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-green-500 flex items-center gap-1 text-[10px] font-bold"><ArrowRight size={12}/> Detail</div>
         </div>
         
-        <div onClick={() => setActiveTab('piutang')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-orange-300 hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden">
-          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Piutang Customer <div className="p-1.5 bg-orange-50 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors"><Users size={14}/></div></div>
+        <div onClick={() => setActiveTab('piutang')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-orange-300 hover:shadow-md transition-all group relative overflow-hidden">
+          <div className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-wider mb-2 flex justify-between items-center relative z-10">Piutang Customer <div className="p-1.5 bg-orange-50 text-orange-600 rounded-lg"><Users size={14}/></div></div>
           <h3 className="text-sm md:text-xl font-black text-orange-600 truncate relative z-10">{formatRp(piutang)}</h3>
-          <div className="absolute bottom-2 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-orange-500 flex items-center gap-1 text-[10px] font-bold"><ArrowRight size={12}/> Detail</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 flex-1 min-h-[400px]">
-        {/* TABEL ANTREAN PENGIRIMAN */}
+        {/* LIST ANTRIAN JALAN */}
         <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl shadow-sm border flex flex-col overflow-hidden">
           <div className="p-4 border-b border-orange-100 bg-orange-50 flex justify-between items-center shrink-0">
             <div>
               <h4 className="font-black text-xs md:text-sm text-gray-800 flex items-center gap-1.5"><Clock size={16} className="text-orange-500"/> Antrean Belum Dikirim</h4>
-              <p className="text-[11px] font-bold text-gray-500 mt-0.5"><span className="font-black text-orange-600">{pendingOrders.length}</span> Pesanan aktif menunggu pemrosesan kiriman</p>
+              <p className="text-[11px] font-bold text-gray-500 mt-0.5"><span className="font-black text-orange-600">{pendingOrders.length}</span> Pesanan menunggu kurir/sopir armada</p>
             </div>
-            <button onClick={() => setActiveTab('rekap')} className="text-[10px] md:text-xs font-black text-orange-700 bg-orange-100 px-3 py-1.5 rounded-lg border border-orange-200 transition-colors">Kelola Antrean</button>
+            <button onClick={() => setActiveTab('rekap')} className="text-[10px] md:text-xs font-black text-orange-700 bg-orange-100 px-3 py-1.5 rounded-lg border border-orange-200">Buka Menu</button>
           </div>
           
           <div className="overflow-x-auto flex-1 p-0">
@@ -202,7 +198,7 @@ const MainDashboard = ({ setActiveTab }) => {
               <tbody className="divide-y border-gray-100">
                 {pendingOrders.map((o, idx) => (
                   <tr key={idx} className="hover:bg-orange-50/20 transition-colors">
-                    <td className="p-3 pl-5 text-gray-500 font-medium">{new Date(o.tanggal).toLocaleDateString('id-ID')}</td>
+                    <td className="p-3 text-gray-500">{new Date(o.tanggal).toLocaleDateString('id-ID')}</td>
                     <td className="p-3 font-black text-gray-800 uppercase">{o.customer?.nama} <span className="text-gray-400 font-mono text-[9px]">(#{o.customerId})</span></td>
                     <td className="p-3 text-gray-600 font-medium max-w-[150px] truncate">
                       {o.items.length > 0 ? `${o.items[0].product?.nama} ${o.items.length > 1 ? `(+${o.items.length - 1})` : ''}` : '-'}
@@ -215,13 +211,13 @@ const MainDashboard = ({ setActiveTab }) => {
                     </td>
                   </tr>
                 ))}
-                {pendingOrders.length === 0 && <tr><td colSpan="5" className="p-12 text-center text-gray-400 font-bold italic">Semua pesanan periode ini telah terkirim dengan aman. 🚚💨</td></tr>}
+                {pendingOrders.length === 0 && <tr><td colSpan="5" className="p-12 text-center text-gray-400 font-bold italic">Semua antrean pengiriman bersih. 🚚💨</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* GRAFIK ONDEMAND & DAFTAR HUTANG PABRIKAN */}
+        {/* GRAFIK & HUTANG */}
         <div className="flex flex-col gap-4 lg:col-span-1">
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 flex flex-col h-[230px] shrink-0">
             <h4 className="font-black text-xs text-gray-800 mb-3 flex items-center gap-1.5"><TrendingUp size={14} className="text-blue-500"/> Aliran Omset Kas Harian</h4>
@@ -240,12 +236,11 @@ const MainDashboard = ({ setActiveTab }) => {
           </div>
 
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm flex flex-col overflow-hidden flex-1 min-h-[200px]">
-            <div className="p-3.5 border-b border-red-100 bg-red-50/50 flex justify-between items-center cursor-pointer hover:bg-red-50 transition-colors group shrink-0" onClick={() => setActiveTab('piutang')}>
+            <div className="p-3.5 border-b border-red-100 bg-red-50/50 flex justify-between items-center cursor-pointer bg-white" onClick={() => setActiveTab('piutang')}>
               <div>
                 <p className="text-[10px] font-black text-red-600 uppercase tracking-wider flex items-center gap-1.5"><Truck size={14}/> Total Hutang ke Pabrik</p>
                 <h2 className="text-base md:text-lg font-black text-red-700 mt-0.5">{formatRp(totalHutangAktif)}</h2>
               </div>
-              <ArrowRight size={18} className="text-red-400 group-hover:text-red-600 transition-colors"/>
             </div>
             <div className="p-3 overflow-y-auto flex-1 bg-white">
               <div className="space-y-2">
@@ -255,7 +250,7 @@ const MainDashboard = ({ setActiveTab }) => {
                     <span className="font-black text-red-600">{formatRp(d.sisa)}</span>
                   </div>
                 ))}
-                {debtList.length === 0 && <p className="text-xs text-gray-400 text-center py-6 font-bold italic">Bebas dari kewajiban tunggakan pabrik. ✨</p>}
+                {debtList.length === 0 && <p className="text-xs text-gray-400 text-center py-6 font-bold italic">Semua hutang lunas 🎉</p>}
               </div>
             </div>
           </div>
