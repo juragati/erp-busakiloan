@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// 1. MODUL AUTENTIKASI (AKUN)
+// ==========================================
+model User {
+  id                 Int                @id @default(autoincrement())
+  username           String             @unique
+  email              String             @unique
+  password           String
+  resetToken         String?            @db.Text
+  createdAt          DateTime           @default(now())
+
+  // Relasi kepemilikan data
+  customers          Customer[]
+  customerCategories CustomerCategory[] 
+  categories         Category[]
+  products           Product[]
+  orders             Order[]
+  sopirs             Sopir[]
+  suppliers          Supplier[]
+  purchases          Purchase[]
+  manualTxs          ManualTransaction[]
+}
+
+// ==========================================
+// 2. MODUL PELANGGAN & PENJUALAN
+// ==========================================
+model CustomerCategory {
+  id        Int        @id @default(autoincrement())
+  userId    Int
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nama      String     
+  customers Customer[]
+}
+
+model Customer {
+  id                      Int               @id @default(autoincrement())
+  userId                  Int               
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId              Int?              
+  category                CustomerCategory? @relation(fields: [categoryId], references: [id]) 
+  nama                    String
+  alamat                  String?
+  kontak                  String?
+  ongkirDefault           Float             @default(0)
+  ongkirPerusahaanDefault Float             @default(0)
+  catatan                 String?           @db.Text
+  orders                  Order[]
+  hargaKhusus             HargaKhusus[]
+}
+
+model Order {
+  id                Int         @id @default(autoincrement())
+  userId            Int         
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId        Int
+  customer          Customer    @relation(fields: [customerId], references: [id])
+  tanggal           DateTime    @default(now())
+  tanggalJatuhTempo DateTime? 
+  status            String      @default("MENUNGGU")
+  dp                Float       @default(0)
+  totalHarga        Float
+  ongkosKirim       Float       @default(0)
+  ongkosKirimModal  Float       @default(0) 
+  metodeBayar       String      @default("TF")
+  keterangan        String?
+  buktiDp           String?
+  buktiLunas        String?
+  items             OrderItem[]
+  sopirId           Int?
+  sopir             Sopir?      @relation(fields: [sopirId], references: [id])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @default(now()) @updatedAt
+}
+
+model OrderItem {
+  id          Int     @id @default(autoincrement())
+  orderId     Int
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product @relation(fields: [productId], references: [id])
+  qty         Float
+  hargaSatuan Float   
+  subtotal    Float
+  hppSatuan   Float   @default(0) 
+}
+
+// ==========================================
+// 3. MODUL PRODUK & GUDANG
+// ==========================================
+model Category {
+  id       Int       @id @default(autoincrement())
+  userId   Int       
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nama     String    
+  products Product[]
+}
+
+model Product {
+  id          Int       @id @default(autoincrement())
+  userId      Int       
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nama        String
+  kategori    String?  
+  categoryId  Int?             
+  category    Category? @relation(fields: [categoryId], references: [id])
+  hargaJual   Float
+  hpp         Float
+  stok        Float     @default(0)
+  satuanBeli  String    @default("kg") 
+  satuanJual  String    @default("pcs")
+  parentId    Int?          
+  parent      Product?  @relation("ProductHierarchy", fields: [parentId], references: [id])
+  children    Product[] @relation("ProductHierarchy")
+  isHppManual Boolean   @default(false) 
+
+  orderItems    OrderItem[]
+  hargaKhusus   HargaKhusus[]
+  purchaseItems PurchaseItem[]
+  stockHistory  StockHistory[] 
+}
+
+model StockHistory {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty        Float
+  tipe       String   // MASUK atau KELUAR
+  keterangan String?
+  ref        String?
+  tanggal    DateTime @default(now())
+}
+
+model HargaKhusus {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  harga      Float
+
+  @@unique([customerId, productId])
+}
+
+// ==========================================
+// 4. MODUL PENGIRIMAN (SOPIR)
+// ==========================================
+model Sopir {
+  id     Int           @id @default(autoincrement())
+  userId Int           
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nama   String
+  kontak String?
+  ongkir OngkirSopir[]
+  orders Order[]
+}
+
+model OngkirSopir {
+  id      Int    @id @default(autoincrement())
+  sopirId Int
+  daerah  String
+  tarif   Float
+  sopir   Sopir  @relation(fields: [sopirId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// 5. MODUL SUPPLIER & PEMBELIAN
+// ==========================================
+model Supplier {
+  id        Int        @id @default(autoincrement())
+  userId    Int        
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nama      String
+  kontak    String?
+  alamat    String?
+  purchases Purchase[]
+  createdAt DateTime   @default(now())
+}
+
+model Purchase {
+  id                Int            @id @default(autoincrement())
+  userId            Int            
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  supplierId        Int
+  supplier          Supplier       @relation(fields: [supplierId], references: [id])
+  items             PurchaseItem[]
+  tanggal           DateTime       @default(now()) 
+  tanggalJatuhTempo DateTime?                      
+  totalTagihan      Float          @default(0) 
+  totalBayar        Float          @default(0) 
+  sisaTagihan       Float          @default(0) 
+  status            String         @default("BELUM LUNAS") 
+  keterangan        String?        @db.Text
+  buktiBayar        String?        @db.Text 
+  buktiNota         String?        @db.Text
+  createdAt         DateTime       @default(now())
+}
+
+model PurchaseItem {
+  id         Int      @id @default(autoincrement())
+  purchaseId Int
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id])
+  qtyBeli    Float    @default(0) 
+  qty        Float                
+  hargaBeli  Float  
+  subtotal   Float
+}
+
+// ==========================================
+// 6. MODUL KEUANGAN (ARUS KAS MANUAL)
+// ==========================================
+model ManualTransaction {
+  id         Int      @id @default(autoincrement())
+  userId     Int      
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipe       String   
+  nama       String   
+  keterangan String?  @db.Text 
+  nominal    Float
+  tanggal    DateTime @default(now())
+  metode     String   @default("CASH") 
+  buktiLink  String?  @db.Text
+  createdAt  DateTime @default(now())
+}
