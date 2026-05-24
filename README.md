@@ -9,15 +9,11 @@ Sistem Perencanaan Sumber Daya Perusahaan (ERP) terpadu untuk mengelola stok, pe
 Sistem ini terbagi menjadi dua bagian: **Frontend (React/Vite)** dan **Backend (Node.js/Express)**. Anda harus menjalankan keduanya secara bersamaan.
 
 ### 1. Persiapan Awal (Install Dependencies)
-
-Buka terminal di dalam VSCode, lalu jalankan perintah ini untuk menginstal semua _library_ yang dibutuhkan:
-
+Buka terminal di dalam VSCode, lalu jalankan perintah ini untuk menginstal semua *library* yang dibutuhkan:
 ```bash
 # Buka tab terminal ke-1 (Untuk Backend)
 cd apps/api
 npm install
-npm install @prisma/client
-npx prisma generate
 
 # Buka tab terminal ke-2 (Untuk Frontend)
 cd apps/web
@@ -156,14 +152,4 @@ A: Halaman "Laba & Profit" menghitung omset bukan berdasarkan kapan dia lunas, m
 Q: Saat mau Hapus Kategori Produk, kenapa dibilang GAGAL?
 A: Karena kategori tersebut masih dipakai oleh salah satu Produk di Gudang. Anda harus masuk ke menu Stok & Produk, edit produk tersebut (ganti kategorinya atau kosongkan), baru kategori tersebut bisa dihapus.
 
-*CARA DAPATKAN "SANDI APLIKASI/APP PASSWORD" GMAIL*
-(untuk integrasi email bot yang mengirimkan pemberitahuan ubah kata sandi)
-Google sekarang tidak mengizinkan login aplikasi menggunakan password biasa. Anda harus membuat Sandi Aplikasi khusus:
-1.	Buka browser, pastikan Anda login ke Gmail, lalu buka Akun Google Anda (Keamanan).
-2.	Pastikan Verifikasi 2 Langkah (2-Step Verification) sudah dalam keadaan Aktif.
-3.	Di bilah pencarian paling atas (Search), ketik "Sandi Aplikasi" atau "App Passwords", lalu klik menu tersebut.
-4.	Di bagian 'Pilih aplikasi', ketik nama bebas (Misal: BusaKiloan ERP), lalu klik Buat (Create).
-5.	Akan muncul kotak kuning berisi 16 huruf sandi. Copy (salin) 16 huruf tersebut.
-
 Developed with ❤️ for BusaKiloan
-```

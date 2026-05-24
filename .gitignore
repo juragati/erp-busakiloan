@@ -1,2 +1,30 @@
 node_modules/
 .env
+apps/api/.env
+apps/api/node_modules
+apps/api/generated/prisma
+
+# Logs
+apps/web/logs
+apps/web/*.log
+apps/web/npm-debug.log*
+apps/web/yarn-debug.log*
+apps/web/yarn-error.log*
+apps/web/pnpm-debug.log*
+apps/web/lerna-debug.log*
+
+apps/web/node_modules
+apps/web/dist
+apps/web/dist-ssr
+apps/web/*.local
+
+# Editor directories and files
+apps/web/.vscode/*
+apps/web/!.vscode/extensions.json
+apps/web/.idea
+apps/web/.DS_Store
+apps/web/*.suo
+apps/web/*.ntvs*
+apps/web/*.njsproj
+apps/web/*.sln
+*.sw?
