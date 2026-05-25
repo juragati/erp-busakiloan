@@ -15,11 +15,13 @@ const PiutangDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState(''); 
-  const today2 = new Date();
-  const defaultStart = `${today2.getFullYear()}-${String(today2.getMonth() + 1).padStart(2, '0')}-01`;
-  const defaultEnd = new Date(today2.getFullYear(), today2.getMonth() + 1, 0).toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState(defaultStart);
-  const [endDate, setEndDate] = useState(defaultEnd);
+  
+  // const today2 = new Date();
+  // const defaultStart = `${today2.getFullYear()}-${String(today2.getMonth() + 1).padStart(2, '0')}-01`;
+  // const defaultEnd = new Date(today2.getFullYear(), today2.getMonth() + 1, 0).toISOString().split('T')[0];
+  
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [filterStatusBayar, setFilterStatusBayar] = useState('');
   const [filterJatuhTempo, setFilterJatuhTempo] = useState('');
 
