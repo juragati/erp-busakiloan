@@ -6,12 +6,6 @@ import LoadingOverlay from './LoadingOverlay';
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const formatRpInput = (angka) => {
-  if (!angka) return '';
-  return angka.toString().replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-};
-const parseRpInput = (text) => text.toString().replace(/[^0-9]/g, '');
-
 const PiutangDashboard = () => {
   const [activeTab, setActiveTab] = useState('customer'); 
   const [orders, setOrders] = useState([]); 
@@ -21,12 +15,11 @@ const PiutangDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState(''); 
-  const [filterBulan, setFilterBulan] = useState('');
-  
-  // PERUBAHAN: Tanggal default dikosongkan agar semua data hutang lama langsung tampil
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  
+  const today2 = new Date();
+  const defaultStart = `${today2.getFullYear()}-${String(today2.getMonth() + 1).padStart(2, '0')}-01`;
+  const defaultEnd = new Date(today2.getFullYear(), today2.getMonth() + 1, 0).toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
   const [filterStatusBayar, setFilterStatusBayar] = useState('');
   const [filterJatuhTempo, setFilterJatuhTempo] = useState('');
 
@@ -46,6 +39,7 @@ const PiutangDashboard = () => {
   const [qtyJual, setQtyJual] = useState('');
   const [hargaBeli, setHargaBeli] = useState('');
 
+  // FUNGSI ANTI CRASH GLOBAL
   const safeNum = (val) => { const num = parseFloat(val); return isNaN(num) ? 0 : num; };
   const formatRp = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(safeNum(n));
 
@@ -63,8 +57,7 @@ const PiutangDashboard = () => {
         const resS = await axios.get(`${baseURL}/api/suppliers`); 
         setSuppliers(resS.data); 
       }
-    } catch (e) { console.error(e); }
-    finally { setIsLoading(false); }
+    } catch { } finally { setIsLoading(false); }
   };
 
   const fetchProducts = async () => { 
@@ -81,7 +74,7 @@ const PiutangDashboard = () => {
       await axios.put(`${baseURL}/api/purchases/${payModal.id}/payment`, { totalBayar: safeNum(payAmount), buktiBayar: buktiTf, tanggal: payDate }); 
       alert("✅ Data Hutang Supplier berhasil diupdate!");
       setPayModal(null); setPayAmount(''); setBuktiTf(''); loadData(); 
-    } catch (e) { alert("Gagal update hutang"); }
+    } catch { alert("Gagal update hutang"); }
     finally { setIsLoading(false); }
   };
 
@@ -93,7 +86,7 @@ const PiutangDashboard = () => {
       await axios.put(`${baseURL}/api/orders/${payModal.id}/payment`, { status: sisa <= 0 ? 'SELESAI' : 'TERKIRIM', dp: newDp, buktiLunas: buktiTf, tanggal: payDate }); 
       alert("✅ Data Piutang Customer berhasil diupdate!");
       setPayModal(null); setPayAmount(''); setBuktiTf(''); loadData(); 
-    } catch (e) { alert("Gagal update piutang"); }
+    } catch { alert("Gagal update piutang"); }
     finally { setIsLoading(false); }
   };
 
@@ -106,7 +99,7 @@ const PiutangDashboard = () => {
       else await axios.put(`${baseURL}/api/purchases/${dateModal.id}/duedate`, { tanggalJatuhTempo: formattedDate });
       alert("✅ Tanggal Jatuh Tempo diperbarui!");
       setDateModal(null); setNewDueDate(''); loadData();
-    } catch (e) { alert("Gagal menyimpan"); }
+    } catch { alert("Gagal menyimpan"); }
     finally { setIsLoading(false); }
   };
 
@@ -163,7 +156,7 @@ const PiutangDashboard = () => {
   const handleSelectProduct = (opt) => { setSelectedProduct(opt); if (opt) setHargaBeli(opt.dataAsli?.hpp || 0); else setHargaBeli(''); };
 
   const handleAddItemToPurchase = () => { 
-      const qBeli = parseFloat(qtyBeli); const qJual = parseFloat(qtyJual); const hBeli = safeNum(hargaBeli); 
+      const qBeli = safeNum(qtyBeli); const qJual = safeNum(qtyJual); const hBeli = safeNum(hargaBeli); 
       if(!selectedProduct || qBeli <= 0 || qJual <= 0) return alert("Pilih produk dan pastikan angka qty/harga lebih dari 0!"); 
       const newItem = { productId: selectedProduct.value, nama: selectedProduct.label, satuanBeli: selectedProduct.dataAsli?.satuanBeli || '-', satuanJual: selectedProduct.dataAsli?.satuanJual || '-', qtyBeli: qBeli, qty: qJual, hargaBeli: hBeli, subtotal: qBeli*hBeli };
       setPurchaseForm(p => ({ ...p, items: [...p.items, newItem] })); 
@@ -191,7 +184,7 @@ const PiutangDashboard = () => {
            alert("✅ BARANG MASUK BERHASIL DISIMPAN!"); 
         }
         setIsPurchaseModalOpen(false); loadData(); 
-    } catch(e){ alert("Gagal menyimpan data."); } 
+    } catch { alert("Gagal menyimpan data."); }
     finally { setIsLoading(false); }
   };
 
@@ -304,11 +297,11 @@ const PiutangDashboard = () => {
             </div>
             {activeTab === 'supplier' && <select className="border bg-white p-2.5 rounded-xl text-xs font-bold text-gray-600 outline-none flex-1 lg:flex-none shadow-sm cursor-pointer" value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}><option value="">Semua Supplier</option>{suppliers.map(s => (<option key={s.id} value={s.id}>{s.nama} (#{s.id})</option>))}</select>}
             <select className="border bg-white p-2.5 rounded-xl text-xs font-bold text-gray-600 outline-none flex-1 lg:flex-none shadow-sm cursor-pointer" value={filterStatusBayar} onChange={(e) => setFilterStatusBayar(e.target.value)}><option value="">Semua Tagihan</option><option value="BELUM_LUNAS">Belum Lunas</option><option value="LUNAS">Sudah Lunas</option></select>
-            <select className="border bg-white p-2.5 rounded-xl text-xs font-bold text-gray-600 outline-none flex-1 lg:flex-none shadow-sm cursor-pointer text-red-600 border-red-100" value={filterJatuhTempo} onChange={(e) => setFilterJatuhTempo(e.target.value)}>
+            <select className="border bg-white p-2.5 rounded-xl text-xs font-bold text-gray-600 outline-none flex-1 lg:flex-none shadow-sm cursor-pointer" value={filterJatuhTempo} onChange={(e) => setFilterJatuhTempo(e.target.value)}>
               <option value="">Semua Jatuh Tempo</option>
-              <option value="OVERDUE">&#x26A0; Sudah Lewat (Overdue)</option>
+              <option value="OVERDUE">&#x26A0; Sudah Lewat</option>
               <option value="TODAY">Jatuh Tempo Hari Ini</option>
-              <option value="WEEK">Dalam 7 Hari Kedepan</option>
+              <option value="WEEK">Dalam 7 Hari</option>
             </select>
           </div>
           <div className="relative w-full lg:w-64 mt-2 lg:mt-0"><Search className="absolute left-3 top-2.5 text-gray-400" size={16} /><input className="pl-9 pr-4 py-2.5 border rounded-xl w-full text-xs outline-none focus:border-blue-500 shadow-sm bg-white" placeholder="Cari ID / Nama..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
@@ -330,7 +323,7 @@ const PiutangDashboard = () => {
                 <th className="p-4 text-center">Bukti / Link</th>
                 <th className="p-4">Rincian & QTY</th>
                 <th className="p-4 text-right">Total Tagihan</th>
-                <th className="p-4 text-right text-green-700 bg-green-50/50">Sudah Bayar</th>
+                <th className="p-4 text-right text-green-700 bg-green-50/50">Sudah Dibayar</th>
                 <th className="p-4 text-center text-green-700 bg-green-50/50">Tgl Pembayaran</th>
                 <th className="p-4 text-right text-red-700 bg-red-50/50">Sisa Hutang</th>
                 <th className="p-4 text-center">Status & Aksi</th>
@@ -427,7 +420,6 @@ const PiutangDashboard = () => {
         </div>
       </div>
 
-      {/* --- FORM BARANG MASUK --- */}
       {isPurchaseModalOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-2 md:p-4 backdrop-blur-sm">
           <div className={`bg-white rounded-xl shadow-2xl w-full max-w-[850px] max-h-[95vh] overflow-hidden flex flex-col ${purchaseForm.id ? 'border-2 border-blue-500' : ''}`}>
@@ -491,7 +483,7 @@ const PiutangDashboard = () => {
                   
                   <div className="w-32">
                     <label className="text-[10px] font-bold text-red-600 mb-1 block uppercase">Harga/{selectedProduct ? (selectedProduct.dataAsli?.satuanBeli || '-') : '-'}</label>
-                    <input type="text" inputMode="numeric" className="w-full border-2 p-2 rounded-lg outline-none focus:border-red-500 text-sm font-bold text-red-700" value={formatRpInput(hargaBeli)} onChange={e=>setHargaBeli(parseRpInput(e.target.value))} placeholder="Rp" />
+                    <input type="number" className="w-full border-2 p-2 rounded-lg outline-none focus:border-red-500 text-sm font-bold text-red-700" value={hargaBeli} onChange={e=>setHargaBeli(e.target.value)} placeholder="Rp" />
                   </div>
 
                   <div className="w-28">
@@ -557,10 +549,10 @@ const PiutangDashboard = () => {
                   <div className="flex justify-between font-bold text-green-700 items-center gap-2">
                     <span className="text-xs uppercase whitespace-nowrap">Bayar:</span>
                     <input 
-                      type="text" inputMode="numeric" 
+                      type="number" 
                       className="w-1/2 border-2 p-2.5 rounded-lg text-right font-black bg-green-50 outline-none focus:border-green-500 text-sm" 
-                      value={formatRpInput(purchaseForm.bayar)} 
-                      onChange={e=>setPurchaseForm({...purchaseForm, bayar:parseRpInput(e.target.value)})} 
+                      value={purchaseForm.bayar} 
+                      onChange={e=>setPurchaseForm({...purchaseForm, bayar:e.target.value})} 
                       placeholder="0" 
                     />
                   </div>
@@ -590,8 +582,8 @@ const PiutangDashboard = () => {
 
               <div className="flex gap-3 pt-2">
                   <button onClick={() => setIsPurchaseModalOpen(false)} className="flex-1 py-4 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors">Batalkan</button>
-                  <button onClick={handleSimpanBarangMasuk} disabled={isProcessing} className="flex-[2] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex justify-center items-center gap-2 transition-transform active:scale-95 bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
-                      <Save size={22}/> {purchaseForm.id ? 'SIMPAN REVISI NOTA' : 'SIMPAN BARANG MASUK'}
+                  <button onClick={handleSimpanBarangMasuk} disabled={isLoading} className={`flex-[2] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex justify-center items-center gap-2 transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${purchaseForm.id ? (isLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700') : (isLoading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700')}`}>
+                      <Save size={22}/> {isLoading ? 'Menyimpan...' : (purchaseForm.id ? 'SIMPAN REVISI NOTA' : 'SIMPAN BARANG MASUK')}
                   </button>
               </div>
             </div>
@@ -599,9 +591,9 @@ const PiutangDashboard = () => {
         </div>
       )}
 
-      {/* MODAL UPDATE PEMBAYARAN KECIL */}
+      {/* POP-UP MODAL PEMBAYARAN */}
       {payModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-gray-900/60 flex items-center justify-center z-[10000] p-4 backdrop-blur-sm">
            <div className="bg-white p-6 rounded-2xl shadow-2xl w-[400px] border border-gray-100">
               <h3 className={`font-bold text-xl border-b pb-3 mb-4 flex items-center gap-2 ${activeTab==='customer'?'text-blue-800':'text-red-800'}`}>
                 {activeTab==='customer'?<Users size={20}/>:<Truck size={20}/>} Form Pembayaran
@@ -630,7 +622,7 @@ const PiutangDashboard = () => {
 
               <div className="mb-4">
                 <label className="text-xs font-bold text-gray-600 mb-1.5 block">Total Akumulasi Dibayar (Rp)</label>
-                <input type="text" inputMode="numeric" className="w-full border-2 p-3 rounded-xl font-black text-lg outline-none focus:border-green-500 text-green-700 bg-green-50/50 shadow-sm" value={formatRpInput(payAmount)} onChange={e => setPayAmount(parseRpInput(e.target.value))} />
+                <input type="number" className="w-full border-2 p-3 rounded-xl font-black text-lg outline-none focus:border-green-500 text-green-700 bg-green-50/50 shadow-sm" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
                 <p className="text-[10px] text-gray-400 mt-1.5 italic">*Ganti angka ini dengan total akumulasi yang sudah dibayar secara keseluruhan.</p>
               </div>
 
@@ -641,12 +633,13 @@ const PiutangDashboard = () => {
 
               <div className="flex gap-3">
                 <button onClick={() => setPayModal(null)} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">Batal</button>
-                <button onClick={activeTab === 'customer' ? handlePayCustomer : handlePaySupplier} disabled={isProcessing} className={`flex-1 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 shadow-md transition-transform active:scale-95 disabled:opacity-50 ${activeTab === 'customer' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}><Save size={18}/> Simpan</button>
+                  <button onClick={activeTab === 'customer' ? handlePayCustomer : handlePaySupplier} disabled={isLoading} className={`flex-1 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 shadow-md transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${activeTab === 'customer' ? (isLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700') : (isLoading ? 'bg-gray-400' : 'bg-red-600 hover:bg-red-700')}`}><Save size={18}/> {isLoading ? 'Menyimpan...' : 'Simpan'}</button>
               </div>
            </div>
         </div>
       )}
 
+      {/* POP-UP CATATAN */}
       {noteModal && (
         <div className="fixed inset-0 bg-gray-900/60 flex items-center justify-center z-[10000] p-4 backdrop-blur-sm">
           <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-[400px]">
@@ -659,9 +652,13 @@ const PiutangDashboard = () => {
                   Oleh: <span className="text-blue-600">{noteModal?.nama}</span>
                 </p>
               </div>
-              <button onClick={() => setNoteModal(null)} className="text-gray-400 bg-gray-100 p-2 rounded-full hover:text-red-500 transition-colors"><X size={16}/></button>
+              <button onClick={() => setNoteModal(null)} className="text-gray-400 bg-gray-100 p-2 rounded-full hover:text-red-500 transition-colors">
+                <X size={16}/>
+              </button>
             </div>
-            <div className="bg-yellow-50/50 p-4 rounded-2xl text-sm text-gray-700 leading-relaxed max-h-[40vh] overflow-auto border border-yellow-100 font-medium whitespace-pre-wrap">{noteModal?.text}</div>
+            <div className="bg-yellow-50/50 p-4 rounded-2xl text-sm text-gray-700 leading-relaxed max-h-[40vh] overflow-auto border border-yellow-100 font-medium whitespace-pre-wrap">
+              {noteModal?.text}
+            </div>
           </div>
         </div>
       )}
@@ -675,7 +672,7 @@ const PiutangDashboard = () => {
               <div className="flex justify-between text-gray-500 text-xs"><span>Tgl Transaksi:</span><span>{new Date(dateModal.tanggal).toLocaleDateString('id-ID')}</span></div>
             </div>
             <div className="mb-6"><label className="text-xs font-bold text-gray-600 mb-2 block">Pilih Tanggal Jatuh Tempo Baru:</label><input type="date" className={`w-full border-2 p-3 rounded-xl font-bold text-sm outline-none focus:border-blue-500 ${!newDueDate ? 'border-red-300 bg-red-50' : 'bg-white'}`} value={newDueDate} onChange={e => setNewDueDate(e.target.value)} /></div>
-            <div className="flex gap-3"><button onClick={() => setDateModal(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-xl text-xs font-bold text-gray-600 transition-colors">Batal</button><button onClick={handleSaveDueDate} disabled={isProcessing} className={`flex-1 text-white py-3 rounded-xl text-xs font-bold shadow-md transition-transform active:scale-95 disabled:opacity-50 ${activeTab === 'customer' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}>Simpan</button></div>
+            <div className="flex gap-3"><button onClick={() => setDateModal(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-xl text-xs font-bold text-gray-600 transition-colors">Batal</button><button onClick={handleSaveDueDate} className={`flex-1 text-white py-3 rounded-xl text-xs font-bold shadow-md transition-transform active:scale-95 ${activeTab === 'customer' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}>Simpan Tanggal</button></div>
           </div>
         </div> 
       )}

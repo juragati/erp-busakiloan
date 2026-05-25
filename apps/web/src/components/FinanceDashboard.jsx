@@ -15,11 +15,11 @@ const FinanceDashboard = () => {
   const [isEditing, setIsEditing] = useState(false); 
   const [form, setForm] = useState({ id: null, tipe: 'PENGELUARAN', nama: '', nominal: '', tanggal: '', metode: 'CASH', keterangan: '', buktiLink: '' });
 
-  // const today = new Date();
-  // const defaultStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-  // const defaultEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const today = new Date();
+  const defaultStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  const defaultEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
 
   useEffect(() => { loadData(); }, []);
   const loadData = async () => {
