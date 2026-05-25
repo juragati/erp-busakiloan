@@ -92,7 +92,6 @@ model OrderItem {
   hargaSatuan Float   
   subtotal    Float
   hppSatuan   Float   @default(0) 
-  manualTransaction   ManualTransaction
 }
 
 // ==========================================
@@ -225,8 +224,6 @@ model ManualTransaction {
   id         Int      @id @default(autoincrement())
   userId     Int      
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderId    Int      @unique
-  order      DataOrder? @relation(fields: [order_id], references: [id], onDelete: Cascade)
   tipe       String   
   nama       String   
   keterangan String?  @db.Text 
