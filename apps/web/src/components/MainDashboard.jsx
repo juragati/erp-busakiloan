@@ -64,16 +64,27 @@ const MainDashboard = ({ setActiveTab }) => {
       }
 
       if (o.status === 'TERKIRIM' || o.status === 'SELESAI') {
-        let hppOrder = 0;
-        let penjualanOrder = 0;
+        let orderOmsetBarang = 0;
+        let orderModalBarang = 0;
+        let hasValidItem = false;
         
         o.items.forEach(i => { 
-          hppOrder += (i.qty * (i.hppSatuan || i.product?.hpp || 0)); 
-          penjualanOrder += (i.qty * i.hargaSatuan);
+          const hargaJualValid = parseFloat(i.hargaSatuan || i.hargaJual || 0);
+          const hppValid = parseFloat(i.hppSatuan || 0);
+          const qtyValid = parseFloat(i.qty || 0);
+          if (hppValid > 0) {
+            orderOmsetBarang += (hargaJualValid * qtyValid);
+            orderModalBarang += (hppValid * qtyValid);
+            hasValidItem = true;
+          }
         });
         
-        const marginOngkir = (o.ongkosKirim || 0) - (o.ongkosKirimModal || 0);
-        profitKasar += (penjualanOrder - hppOrder) + marginOngkir;
+        const ongkirIn = parseFloat(o.ongkosKirim || 0);
+        const ongkirOut = parseFloat(o.ongkosKirimModal || 0);
+        
+        if (hasValidItem) {
+          profitKasar += (orderOmsetBarang - orderModalBarang) + (ongkirIn - ongkirOut);
+        }
       }
     }
   });
