@@ -221,7 +221,10 @@ const PiutangDashboard = () => {
     }
     return matchName && matchTanggal && matchStatus && matchJatuhTempo; 
   });
-  const totalPiutangCustomer = filteredOrders.reduce((sum, o) => sum + o.kekurangan, 0); 
+  const totalPiutangCustomer = filteredOrders.reduce((sum, o) => {
+  const sisaTagihan = o.kekurangan > 0 ? o.kekurangan : 0;
+  return sum + sisaTagihan;
+}, 0);
   
   const filteredPurchases = purchases.filter(p => { 
     const matchSearch = p.supplier?.nama.toLowerCase().includes(searchTerm.toLowerCase()) || p.supplierId?.toString().includes(searchTerm) || p.id?.toString().includes(searchTerm);
@@ -246,7 +249,10 @@ const PiutangDashboard = () => {
     }
     return matchSearch && matchSupplier && matchTanggal && matchStatus && matchJatuhTempo; 
   });
-  const totalHutangSupplier = filteredPurchases.reduce((sum, p) => sum + p.sisaTagihan, 0); 
+  const totalHutangSupplier = filteredPurchases.reduce((sum, p) => {
+  const sisaHutangReal = p.sisaTagihan > 0 ? p.sisaTagihan : 0;
+  return sum + sisaHutangReal;
+}, 0); 
 
   const renderLinks = (textString, isLunas) => {
     if (!textString) return null; const links = textString.split(/\s+/).filter(l => l.trim() !== '');
