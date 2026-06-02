@@ -1,8 +1,10 @@
-// 4. SopirList.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, Edit2, Trash2, PlusCircle, Save, X, Truck, MapPin, ChevronDown, Download } from 'lucide-react';
 import LoadingOverlay from './LoadingOverlay';
+
+// Import formatter dari utils
+import { formatRupiahInput, parseRupiahInput, formatRp } from '../utils/currencyFormatter';
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -11,9 +13,7 @@ const SopirList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-
   const [expandedRow, setExpandedRow] = useState(null);
-
   const [form, setForm] = useState({ id: null, nama: '', kontak: '', ongkir: [] });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -27,15 +27,15 @@ const SopirList = () => {
   };
 
   const openEditModal = (s) => {
-    setForm({ 
-      id: s.id, nama: s.nama, kontak: s.kontak || '', 
-      ongkir: s.ongkir.length > 0 ? s.ongkir : [{ daerah: '', tarif: '' }] 
+    setForm({
+      id: s.id, nama: s.nama, kontak: s.kontak || '',
+      ongkir: s.ongkir.length > 0 ? s.ongkir : [{ daerah: '', tarif: '' }]
     });
     setIsEditing(true); setIsModalOpen(true);
   };
 
   const handleAddOngkirRow = () => setForm({ ...form, ongkir: [...form.ongkir, { daerah: '', tarif: '' }] });
-  
+
   const handleRemoveOngkirRow = (index) => {
     const newOngkir = form.ongkir.filter((_, idx) => idx !== index);
     setForm({ ...form, ongkir: newOngkir });
@@ -54,8 +54,8 @@ const SopirList = () => {
     try {
       await axios.post(`${baseURL}/api/sopir/upsert`, { ...form, ongkir: validOngkir });
       setIsModalOpen(false); fetchSopirs();
-    } catch (e) { 
-      alert("Gagal menyimpan data: " + (e.response?.data?.error || e.message)); 
+    } catch (e) {
+      alert("Gagal menyimpan data: " + (e.response?.data?.error || e.message));
     } finally { setIsLoading(false); }
   };
 
@@ -77,9 +77,10 @@ const SopirList = () => {
     else setExpandedRow(id);
   };
 
-  const formatRp = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n || 0);
-
-  const filtered = sopirs.filter(s => s.id?.toString().includes(searchTerm) || s.nama.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = sopirs.filter(s =>
+    s.id?.toString().includes(searchTerm) ||
+    s.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -98,7 +99,6 @@ const SopirList = () => {
           <input className="pl-10 pr-4 py-2.5 border rounded-lg w-full text-sm outline-none focus:border-blue-500 shadow-sm" placeholder="Cari ID / Nama Sopir..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
       </div>
-
       <div className="overflow-x-auto flex-1 bg-white border rounded-xl shadow-sm">
         <table className="w-full text-sm text-left whitespace-nowrap">
           <thead className="bg-gray-50 font-semibold text-gray-600 border-b">
@@ -119,10 +119,7 @@ const SopirList = () => {
                   <td className="p-4 text-gray-600">{s.kontak || '-'}</td>
                   <td className="p-4">
                     {s.ongkir.length > 0 ? (
-                      <button 
-                        onClick={() => toggleRow(s.id)} 
-                        className="flex items-center gap-1.5 text-orange-700 font-bold text-xs bg-orange-50 px-3 py-2 rounded-lg hover:bg-orange-100 transition-colors shadow-sm"
-                      >
+                      <button onClick={() => toggleRow(s.id)} className="flex items-center gap-1.5 text-orange-700 font-bold text-xs bg-orange-50 px-3 py-2 rounded-lg hover:bg-orange-100 transition-colors shadow-sm">
                         <MapPin size={14}/> Lihat Tarif ({s.ongkir.length} Daerah)
                         <ChevronDown size={14} className={`transition-transform duration-200 ${expandedRow === s.id ? 'rotate-180' : ''}`} />
                       </button>
@@ -137,7 +134,6 @@ const SopirList = () => {
                     </div>
                   </td>
                 </tr>
-
                 {expandedRow === s.id && s.ongkir.length > 0 && (
                   <tr>
                     <td colSpan="5" className="p-0 border-b border-gray-100 bg-orange-50/30">
@@ -159,7 +155,6 @@ const SopirList = () => {
           </tbody>
         </table>
       </div>
-
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-900/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-[500px] flex flex-col max-h-[90vh] overflow-hidden">
@@ -170,13 +165,11 @@ const SopirList = () => {
             
             <div className="p-5 space-y-4 overflow-y-auto">
               <div><label className="text-xs font-semibold text-gray-600 mb-1 block">Nama Sopir</label><input className="border-2 p-2.5 rounded-lg w-full text-sm font-bold outline-none focus:border-blue-500 uppercase" value={form.nama} onChange={e=>setForm({...form, nama:e.target.value})} placeholder="Nama..." /></div>
-              <div><label className="text-xs font-semibold text-gray-600 mb-1 block">Nomor WA / Kontak</label><input className="border-2 p-2.5 rounded-lg w-full text-sm outline-none focus:border-blue-500" value={form.kontak} onChange={e=>setForm({...form, kontak:e.target.value})} placeholder="08..." /></div>
-              
+              <div><label className="text-xs font-semibold text-gray-600 mb-1 block">Nomor WA / Kontak</label><input className="border-2 p-2.5 rounded-lg w-full text-sm outline-none focus:border-blue-500" value={form.kontak} onChange={e=>setForm({...form, kontak:e.target.value})} placeholder="08..." /></div>  
               <div className="pt-2">
                 <div className="flex justify-between items-center mb-3">
                   <label className="text-xs font-bold text-gray-800 uppercase tracking-wide">Data Tarif Ongkir Daerah</label>
                 </div>
-
                 <button onClick={handleAddOngkirRow} className="w-full mb-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-transform active:scale-95">
                   <PlusCircle size={14}/> + Tambah Daerah Baru
                 </button>
@@ -185,7 +178,7 @@ const SopirList = () => {
                   {form.ongkir.map((o, idx) => (
                     <div key={idx} className="flex gap-2 items-center bg-gray-50 p-2 border rounded-lg">
                       <input className="flex-1 border p-2 rounded text-xs outline-none focus:border-blue-500 uppercase" placeholder="Nama Daerah (cth: Sleman)" value={o.daerah} onChange={e => handleChangeOngkir(idx, 'daerah', e.target.value)} />
-                      <input type="number" className="w-32 border p-2 rounded text-xs font-bold text-orange-700 outline-none focus:border-blue-500" placeholder="Tarif (Rp)" value={o.tarif} onChange={e => handleChangeOngkir(idx, 'tarif', e.target.value)} />
+                      <input type="text" className="w-32 border p-2 rounded text-xs font-bold text-orange-700 outline-none focus:border-blue-500" placeholder="Tarif (Rp)" value={formatRupiahInput(o.tarif)} onChange={e => handleChangeOngkir(idx, 'tarif', parseRupiahInput(e.target.value))} />
                       <button onClick={() => handleRemoveOngkirRow(idx)} className="text-red-500 hover:bg-red-100 p-1.5 rounded"><Trash2 size={16}/></button>
                     </div>
                   ))}
@@ -193,7 +186,6 @@ const SopirList = () => {
                 </div>
               </div>
             </div>
-
             <div className="p-4 border-t bg-gray-50 flex gap-3 shrink-0">
               <button onClick={() => setIsModalOpen(false)} disabled={isLoading} className="flex-1 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-50">Batal</button>
               <button onClick={handleSave} disabled={isLoading} className={`flex-1 py-2.5 text-white rounded-lg text-sm font-bold flex justify-center items-center gap-2 disabled:cursor-not-allowed ${isLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
@@ -206,4 +198,5 @@ const SopirList = () => {
     </div>
   );
 };
+
 export default SopirList;

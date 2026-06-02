@@ -1,23 +1,43 @@
-// Mengubah angka murni (1000000) menjadi string berformat (1.000.000)
-export const formatInputRupiah = (angka) => {
-  if (!angka) return '';
-  const number_string = angka.toString().replace(/[^,\d]/g, '');
-  const split = number_string.split(',');
-  const sisa = split[0].length % 3;
-  let rupiah = split[0].substr(0, sisa);
-  const ribuan = split[0].substr(sisa).match(/\d{3}/gi);
-
-  if (ribuan) {
-    const separator = sisa ? '.' : '';
-    rupiah += separator + ribuan.join('.');
-  }
-
-  rupiah = split[1] !== undefined ? rupiah + ',' + split[1] : rupiah;
-  return rupiah;
+// Angka murni → string format Rupiah (titik sebagai pemisah ribuan)
+// Contoh: 1500000 → "1.500.000"
+export const formatRupiahInput = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const num = value.toString().replace(/\D/g, '');
+  if (!num) return '';
+  return num.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 };
 
-// Mengubah string berformat (1.000.000) kembali ke angka murni (1000000) untuk disimpan ke Database
-export const parseInputRupiah = (formattedValue) => {
-  if (!formattedValue) return 0;
-  return parseInt(formattedValue.toString().replace(/[^0-9]/g, ''), 10) || 0;
+// String format Rupiah → angka integer murni
+// Contoh: "1.500.000" → 1500000
+export const parseRupiahInput = (formatted) => {
+  if (!formatted) return 0;
+  return parseInt(formatted.toString().replace(/\./g, ''), 10) || 0;
+};
+
+// Angka murni → string format Qty (titik = ribuan, koma = desimal)
+// Contoh: 1000.5 → "1.000,5"
+export const formatQtyInput = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  // Hanya izinkan angka dan koma
+  const str = value.toString().replace(/[^0-9,]/g, '');
+  const [intPart, decPart] = str.split(',');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return decPart !== undefined ? `${formattedInt},${decPart}` : formattedInt;
+};
+
+// String format Qty → angka float murni
+// Contoh: "1.000,5" → 1000.5
+export const parseQtyInput = (formatted) => {
+  if (!formatted) return 0;
+  // Hilangkan titik ribuan, ubah koma jadi titik untuk parsing float
+  return parseFloat(formatted.toString().replace(/\./g, '').replace(',', '.')) || 0;
+};
+
+// Untuk display (bukan input): angka murni → "Rp 1.500.000"
+export const formatRp = (n) => {
+  return new Intl.NumberFormat('id-ID', { 
+    style: 'currency', 
+    currency: 'IDR', 
+    minimumFractionDigits: 0 
+  }).format(n || 0);
 };
