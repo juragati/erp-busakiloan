@@ -8,7 +8,7 @@ export const exportData = async (req, res) => {
   try {
     const workbook = new ExcelJS.Workbook();
     
-    // Tentukan tanggal (Bisa jadi null jika master data di-download tanpa filter tanggal)
+    // Tentukan tanggal standar jika tidak ada filter
     const startDate = start ? new Date(start) : new Date('2000-01-01');
     const endDate = end ? new Date(end) : new Date('2100-12-31');
     endDate.setHours(23, 59, 59, 999);
@@ -140,7 +140,7 @@ export const exportData = async (req, res) => {
         { header: 'Jatuh Tempo', key: 'jt', width: 15 } 
       ];
       purchases.forEach(p => {
-        let jtDate = p.tanggalJatuhTempo ? new Date(p.tanggalJatuhTempo) : new Date(p.tanggal); if (!p.tanggalJatuhTempo) jtDate.setDate(jtDate.getDate() + 7);
+        let jtDate = p.tanggalJatuhTempo ? new Date(p.tanggalJatuhTempo) : new Date(p.tanggal); if (!p.tanggalJatuhTempo) jtDate.setDate(p.tanggalJatuhTempo ? new Date(p.tanggalJatuhTempo).getDate() : new Date(p.tanggal).getDate() + 7);
         sheetPurchase.addRow({ 
           id: `#${p.id}`, 
           tanggal: new Date(p.tanggal).toLocaleDateString('id-ID'), 
@@ -159,16 +159,80 @@ export const exportData = async (req, res) => {
     // 3. FITUR SPESIFIK (Keuangan, Mutasi, Profit, Piutang Khusus)
     // ==========================================
     if (type === 'semua' || type === 'keuangan') {
-      const orders = await prisma.order.findMany({ where: { userId, dp: { gt: 0 }, tanggal: { gte: startDate, lte: endDate } }, include: { customer: true } });
-      const purchases = await prisma.purchase.findMany({ where: { userId, totalBayar: { gt: 0 }, tanggal: { gte: startDate, lte: endDate } }, include: { supplier: true } });
-      const manuals = await prisma.manualTransaction.findMany({ where: { userId, tanggal: { gte: startDate, lte: endDate } } });
+      
+      // PERBAIKAN ALGORITMA: Ambil SEMUA data mentah terlebih dahulu (Tanpa Filter Tanggal) 
+      // Agar kalkulasi sum(pelunasan) tepat, baru nanti difilter di akhir.
+      const orders = await prisma.order.findMany({ where: { userId, dp: { gt: 0 } }, include: { customer: true } });
+      const purchases = await prisma.purchase.findMany({ where: { userId, totalBayar: { gt: 0 } }, include: { supplier: true } });
+      const manuals = await prisma.manualTransaction.findMany({ where: { userId } });
+
+      const pelunasanOrders = {};
+      const pelunasanPurchases = {};
+      
+      // Menyusun peta pelunasan untuk dipotong dari DP order awal
+      manuals.forEach(m => {
+        if (m.keterangan?.includes('SYS_PELUNASAN_ORD_')) {
+          const match = m.keterangan.match(/SYS_PELUNASAN_ORD_(\d+)/);
+          if (match) {
+            const id = parseInt(match[1]);
+            pelunasanOrders[id] = (pelunasanOrders[id] || 0) + m.nominal;
+          }
+        }
+        if (m.keterangan?.includes('SYS_PELUNASAN_PUR_')) {
+          const match = m.keterangan.match(/SYS_PELUNASAN_PUR_(\d+)/);
+          if (match) {
+            const id = parseInt(match[1]);
+            pelunasanPurchases[id] = (pelunasanPurchases[id] || 0) + m.nominal;
+          }
+        }
+      });
 
       let allIn = []; let allOut = [];
-      orders.forEach(o => allIn.push({ tgl: o.tanggal, nama: `${o.customer?.nama} (#${o.customerId})`, nominal: o.dp, metode: o.metodeBayar, ket: `DP Awal Order #${o.id}` }));
+
+      // Memetakan DP Awal (Uang Muka Murni)
+      orders.forEach(o => {
+        const realDp = o.dp - (pelunasanOrders[o.id] || 0);
+        if (realDp > 0) {
+          allIn.push({ 
+            tgl: o.tanggal, 
+            nama: o.customer?.nama ? `${o.customer.nama} (#${o.customerId})` : `Order #${o.id}`, 
+            nominal: realDp, 
+            metode: o.metodeBayar || 'CASH', 
+            ket: `Uang Muka (DP) Awal / Pembayaran Pertama` 
+          });
+        }
+      });
+
+      purchases.forEach(p => {
+        const realDp = p.totalBayar - (pelunasanPurchases[p.id] || 0);
+        if (realDp > 0) {
+          allOut.push({ 
+            tgl: p.tanggal, 
+            nama: p.supplier?.nama ? `${p.supplier.nama} (#${p.supplierId})` : `Supplier #${p.supplierId}`, 
+            nominal: realDp, 
+            metode: p.metodeBayar || 'TF', 
+            ket: `Uang Muka (DP) Awal ke Pabrik` 
+          });
+        }
+      });
+
+      // Memasukkan seluruh Manual Transaksi & Pelunasan
       manuals.filter(m => m.tipe === 'PEMASUKAN').forEach(m => allIn.push({ tgl: m.tanggal, nama: m.nama, nominal: m.nominal, metode: m.metode, ket: m.keterangan }));
-      
-      purchases.forEach(p => allOut.push({ tgl: p.tanggal, nama: `${p.supplier?.nama} (#${p.supplierId})`, nominal: p.totalBayar, metode: 'TF', ket: `DP Awal Pabrik #${p.id}` }));
       manuals.filter(m => m.tipe === 'PENGELUARAN').forEach(m => allOut.push({ tgl: m.tanggal, nama: m.nama, nominal: m.nominal, metode: m.metode, ket: m.keterangan }));
+
+      // TERAPKAN FILTER TANGGAL (Persis seperti yang dilakukan Frontend UI)
+      const sDate = start ? new Date(start).setHours(0,0,0,0) : new Date('2000-01-01').setHours(0,0,0,0);
+      const eDate = end ? new Date(end).setHours(23,59,59,999) : new Date('2100-12-31').setHours(23,59,59,999);
+
+      allIn = allIn.filter(x => {
+        const d = new Date(x.tgl).setHours(0,0,0,0);
+        return d >= sDate && d <= eDate;
+      });
+
+      allOut = allOut.filter(x => {
+        const d = new Date(x.tgl).setHours(0,0,0,0);
+        return d >= sDate && d <= eDate;
+      });
 
       const sheetIn = workbook.addWorksheet('Uang Masuk');
       sheetIn.columns = [ { header: 'Tanggal', key: 'tgl', width: 15 }, { header: 'Sumber', key: 'nama', width: 30 }, { header: 'Nominal', key: 'nominal', width: 20 }, { header: 'Via', key: 'metode', width: 10 }, { header: 'Keterangan', key: 'ket', width: 45 } ];
